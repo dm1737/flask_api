@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -15,19 +15,76 @@ class Destination(db.Model):
     country = db.Column(db.String(100), nullable=False)
     rating = db.Column(db.Float, nullable=False)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'destination': self.destination,
+            'country': self.country,
+            'rating': self.rating
+        }
+
+
+with app.app_context():
+    db.create_all()
+
 
 @app.route('/')
 def home():
-    return "Hello, World!"
+    return jsonify({'message': 'Welcome to the Travel Destinations API!'})
 
 
+@app.route('/destinations', methods=['GET'])
+def get_destinations():
+    destinations = Destination.query.all()
+    return jsonify([dest.to_dict() for dest in destinations])
 
 
+@app.route('/destinations/<int:dest_id>', methods=['GET'])
+def get_destination(dest_id):
+    destination = Destination.query.get_or_404(dest_id)
+    if destination:
+        return jsonify(destination.to_dict())
+    else:
+        return jsonify({'error': 'Destination not found'}), 404
 
 
+@app.route('/destinations', methods=['POST'])
+def add_destination():
+    data = request.get_json()
+    new_destination = Destination(
+        destination=data['destination'],
+        country=data['country'],
+        rating=data['rating']
+    )
+    db.session.add(new_destination)
+    db.session.commit()
+    return jsonify(new_destination.to_dict()), 201
 
 
+@app.route('/destinations/<int:dest_id>', methods=['PUT'])
+def update_destination(dest_id):
+    data = request.get_json()
+    destination = Destination.query.get_or_404(dest_id)
+    if destination:
+        destination.destination = data.get('destination', destination.
+                                           destination)
+        destination.country = data.get('country', destination.country)
+        destination.rating = data.get('rating', destination.rating)
+        db.session.commit()
+        return jsonify(destination.to_dict())
+    else:
+        return jsonify({'error': 'Destination not found'}), 404
 
+
+@app.route('/destinations/<int:dest_id>', methods=['DELETE'])
+def delete_destination(dest_id):
+    destination = Destination.query.get_or_404(dest_id)
+    if destination:
+        db.session.delete(destination)
+        db.session.commit()
+        return jsonify({'message': 'Destination deleted successfully'})
+    else:
+        return jsonify({'error': 'Destination not found'}), 404
 
 
 if __name__ == '__main__':
